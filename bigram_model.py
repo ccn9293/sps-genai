@@ -1,30 +1,77 @@
-from typing import Union
-from fastapi import FastAPI
-from pydantic import BaseModel
-from app.bigram_model import BigramModel
+from collections import defaultdict, Counter
+import random
+import re
 
-app = FastAPI()
 
-# Sample corpus for the bigram model
-corpus = [
-    "The Count of Monte Cristo is a novel written by Alexandre Dumas. \
-It tells the story of Edmond Dantès, who is falsely imprisoned and later seeks revenge.",
-    "this is another example sentence",
-    "we are generating text based on bigram probabilities",
-    "bigram models are simple but effective"
-]
+class BigramModel:
+    def __init__(self, corpus, frequency_threshold=None):
+        """
+        Initialize the BigramModel with a list of sentences (corpus).
+        Builds vocabulary and bigram probabilities.
+        """
+        # Join all sentences into one text
+        text = " ".join(corpus)
 
-bigram_model = BigramModel(corpus)
+        # Tokenize text
+        self.words = self.simple_tokenizer(text, frequency_threshold)
 
-class TextGenerationRequest(BaseModel):
-    start_word: str
-    length: int
+        # Build bigrams
+        self.bigram_probs = self.build_bigram_probabilities(self.words)
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+    def simple_tokenizer(self, text, frequency_threshold=None):
+        """
+        Simple tokenizer that splits text into words (lowercase).
+        Can filter out rare words if frequency_threshold is set.
+        """
+        tokens = re.findall(r"\b\w+\b", text.lower())
 
-@app.post("/generate")
-def generate_text(request: TextGenerationRequest):
-    generated_text = bigram_model.generate_text(request.start_word, request.length)
-    return {"generated_text": generated_text}
+        if not frequency_threshold:
+            return tokens
+
+        word_counts = Counter(tokens)
+        filtered_tokens = [
+            token for token in tokens if word_counts[token] >= frequency_threshold
+        ]
+        return filtered_tokens
+
+    def build_bigram_probabilities(self, words):
+        """
+        Build bigram probabilities from a list of words.
+        """
+        bigrams = list(zip(words[:-1], words[1:]))
+        bigram_counts = Counter(bigrams)
+        unigram_counts = Counter(words)
+
+        bigram_probs = defaultdict(dict)
+        for (w1, w2), count in bigram_counts.items():
+            bigram_probs[w1][w2] = count / unigram_counts[w1]
+
+        return bigram_probs
+
+    def generate_text(self, start_word, num_words=20):
+        """
+        Generate text using the learned bigram probabilities.
+        """
+        current_word = start_word.lower()
+
+        # If start word not in vocab, pick a random one
+        if current_word not in self.bigram_probs:
+            current_word = random.choice(list(self.bigram_probs.keys()))
+
+        generated_words = [current_word]
+
+        for _ in range(num_words - 1):
+            next_words = self.bigram_probs.get(current_word)
+
+            if not next_words:
+                break  # no continuation, stop early
+
+            next_word = random.choices(
+                list(next_words.keys()),
+                weights=next_words.values()
+            )[0]
+
+            generated_words.append(next_word)
+            current_word = next_word
+
+        return " ".join(generated_words)
