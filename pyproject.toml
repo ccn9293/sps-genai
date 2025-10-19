@@ -1,14 +1,12 @@
 [project]
-name = "sps-genai"
+name = "assignment2-cnn"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi[standard]>=0.116.1",
+    "fastapi>=0.119.0",
+    "torch>=2.9.0",
 ]
-
-[tool.uv.workspace]
-members = [
-    "sps_genai",
-]
+# toml file is ingredients
+# uv.lock file is recipe 
